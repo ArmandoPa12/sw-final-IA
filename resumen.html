@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Resumen con ChatGPT</title>
+</head>
+
+<body>
+    <h2>Ingresa un texto para resumir con fechas:</h2>
+    <textarea id="texto" rows="10" cols="80"></textarea><br><br>
+    <button onclick="enviarTexto()">Enviar</button>
+
+    <h3>Respuesta del servidor:</h3>
+    <pre id="respuesta" style="background:#f0f0f0; padding:10px;"></pre>
+
+    <script>
+        async function enviarTexto() {
+            const texto = document.getElementById('texto').value;
+
+            const respuestaElemento = document.getElementById('respuesta');
+            respuestaElemento.textContent = 'Cargando...';
+
+            try {
+                const res = await fetch('http://localhost:5000/resumir-chatgpt', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        texto
+                    })
+                });
+
+                const data = await res.json();
+                respuestaElemento.textContent = JSON.stringify(data, null, 2);
+            } catch (err) {
+                respuestaElemento.textContent = 'Error: ' + err.message;
+            }
+        }
+    </script>
+</body>
+
+</html>
