@@ -6,7 +6,7 @@ dist/
 htmlcov/
 .tox/
 docs/_build/
-Lib/
+Lib/site-packages
 hechos/
 .env
 
