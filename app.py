@@ -17,28 +17,6 @@ CORS(app)
 
 
 
-model = whisper.load_model("tiny")
-
-@app.route('/transcribir', methods=['POST'])
-def transcribir_audio():
-    if 'audio' not in request.files:
-        return jsonify({'error': 'No se envió archivo de audio'}), 400
-
-    audio_file = request.files['audio']
-
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as temp:
-        audio_path = temp.name
-        audio_file.save(audio_path)
-
-    try:
-        result = model.transcribe(audio_path, language="Spanish")
-        texto = result["text"]
-        return jsonify({'transcripcion': texto})
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-    finally:
-        os.remove(audio_path)
-
 
 @app.route('/transcribir/url', methods=['POST'])
 def transcribir_desde_url():
@@ -66,114 +44,6 @@ def transcribir_desde_url():
     finally:
         if 'audio_path' in locals() and os.path.exists(audio_path):
             os.remove(audio_path)
-
-
-
-@app.route('/resumir', methods=['POST'])
-def resumir_texto():
-    data = request.get_json()
-
-    if not data or 'texto' not in data:
-        return jsonify({'error': 'No se envió texto para resumir'}), 400
-
-    texto = data['texto']
-
-    prompt = f"""
-Dado el siguiente texto:
-
-{texto}
-
-Haz lo siguiente:
-
-1. Resume el contenido en formato **Markdown**, con viñetas o secciones claras si es posible.
-2. Extrae todas las fechas importantes (en cualquier formato: "12 de mayo de 1990", "1990-05-12", "1ro de mayo", etc.).
-3. Por cada fecha extraída, crea un objeto JSON con:
-   - `"fecha"`: la fecha en formato estándar (YYYY-MM-DD o MM-DD si no hay año).
-   - `"titulo"`: una breve descripción del evento o hecho relacionado con esa fecha.
-
-Devuelve una **respuesta en JSON** con dos claves:
-- `"markdown"`: el resumen en formato Markdown.
-- `"fechas"`: una lista de objetos con las fechas extraídas y sus títulos.
-
-NO EXPLIQUES NADA. SOLO DEVUELVE EL JSON DE RESPUESTA.
-"""
-
-    try:
-        respuesta = requests.post(
-            "http://localhost:11434/api/generate",
-            json={
-                "model": "mistral",
-                "prompt": prompt,
-                "stream": False
-            }
-        )
-
-        if respuesta.status_code != 200:
-            return jsonify({'error': 'Error al generar respuesta con Mistral'}), 500
-
-        contenido = respuesta.json().get("response", "").strip()
-
-        inicio = contenido.find('{')
-        if inicio != -1:
-            try:
-                contenido_json = contenido[inicio:]
-                return jsonify(eval(contenido_json))
-            except Exception as e:
-                return jsonify({'error': 'Error al procesar JSON: ' + str(e), 'raw': contenido}), 500
-
-        return jsonify({'error': 'No se pudo extraer JSON de la respuesta', 'raw': contenido})
-
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/mapa', methods=['POST'])
-def mapa_mental():
-    data = request.get_json()
-    print('=====inicio de mapa===========')
-    if not data or 'texto' not in data:
-        return jsonify({'error': 'No se envió texto para resumir'}), 400
-
-    texto = data['texto']
-
-    prompt = f"""
-Dado el siguiente texto:
-
-{texto}
-
-saluda tambien 
-"""
-
-    try:
-        respuesta = requests.post(
-            "http://localhost:11434/api/generate",
-            json={
-                "model": "mistral",
-                "prompt": prompt,
-                "stream": False
-            }
-        )
-
-        if respuesta.status_code != 200:
-            return jsonify({'error': 'Error al generar respuesta con Mistral'}), 500
-
-        # Tratar de parsear directamente la respuesta como JSON
-        contenido = respuesta.json().get("response", "").strip()
-
-        # # A veces Ollama devuelve texto no válido. Intentamos aislar solo el JSON:
-        # inicio = contenido.find('{')
-        # if inicio != -1:
-        #     try:
-        #         contenido_json = contenido[inicio:]
-        #         return jsonify(eval(contenido_json))
-        #     except Exception as e:
-        #         return jsonify({'error': 'Error al procesar JSON: ' + str(e), 'raw': contenido}), 500
-        print('===== fin de mapa===========')
-
-        return jsonify({'raw': contenido})
-
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
 
 
 
@@ -228,14 +98,16 @@ def resumir_con_chatgpt():
 
         respuesta_json = json.loads(contenido_json)
         return jsonify(respuesta_json)
-
+        # import json
+        # respuesta_json = json.loads(respuesta_modelo)
+        # return jsonify(respuesta_json)
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     
 
 
-@app.route('/   ', methods=['POST'])
+@app.route('/generar-mapa-mental', methods=['POST'])
 def generar_mapa_mental():
     data = request.get_json()
     texto = data.get("texto", "")
