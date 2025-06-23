@@ -5,9 +5,10 @@ from flask_cors import CORS
 import tempfile
 import requests
 from openai import OpenAI
+import re, json
 
 
-client = OpenAI(api_key="charGPT-APIKEY")
+client = OpenAI(api_key="APIKEY")
 
 print("Iniciando Flask...")
 
@@ -15,7 +16,7 @@ app = Flask(__name__)
 CORS(app)
 
 
-# Cargar modelo una sola vez (esto evita cargarlo en cada petición)
+
 model = whisper.load_model("tiny")
 
 @app.route('/transcribir', methods=['POST'])
@@ -197,8 +198,8 @@ def resumir_con_chatgpt():
             {{
             "markdown": "### Resumen\\n- Abraham Lincoln nació en 1809-02-12.\\n- El Día del Trabajo se celebra el 01-05 cada año.",
             "fechas": [
-                {{ "fecha": "1809-02-12", "titulo": "Nacimiento de Abraham Lincoln" }},
-                {{ "fecha": "05-01", "titulo": "Día del Trabajo" }}
+                {{ "fecha": "1809-10-30 10:00:00.000", "titulo": "Nacimiento de Abraham Lincoln" }},
+                {{ "fecha": "2025-12-31 10:00:00.000", "titulo": "Día del Trabajo" }}
             ]
             }}
 
@@ -209,16 +210,75 @@ def resumir_con_chatgpt():
 
     try:
         completion = client.chat.completions.create(
-            # model="gpt-4o",  # o "gpt-3.5-turbo" si prefieres algo más rápido
-            model="gpt-3.5-turbo",
+            # model="gpt-4o",  
+            # gpt-3.5-turbo" 
+            model="gpt-4o",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.3 
         )
-        respuesta_modelo = completion.choices[0].message.content
 
-        # Intentamos parsear como JSON (solo si el modelo responde en JSON bien formado)
-        import json
-        respuesta_json = json.loads(respuesta_modelo)
+        respuesta_modelo = completion.choices[0].message.content
+        print(respuesta_modelo)
+
+        json_match = re.search(r'```(?:json)?\s*([\s\S]+?)\s*```', respuesta_modelo)
+        if json_match:
+            contenido_json = json_match.group(1)
+        else:
+            contenido_json = respuesta_modelo 
+
+        respuesta_json = json.loads(contenido_json)
+        return jsonify(respuesta_json)
+
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    
+
+
+@app.route('/   ', methods=['POST'])
+def generar_mapa_mental():
+    data = request.get_json()
+    texto = data.get("texto", "")
+
+    if not texto:
+        return jsonify({"error": "Texto vacío"}), 400
+
+    prompt = f"""
+Eres un generador de JSON estricto. No expliques nada, solo responde en JSON válido.
+
+Analiza el siguiente texto y genera un mapa mental en formato **Mermaid Mindmap**.
+
+El formato debe ser así:
+
+{{
+  "mermaid": "mermaid\\nmindmap\\n  root((TEMA PRINCIPAL))\\n    Subtema\\n      Idea 1\\n      Idea 2"
+}}
+
+Usa subtítulos resumidos, ideas concisas, no repitas el contenido literal, organiza el tema principal con subtemas e ideas relevantes.
+
+No incluyas explicaciones, ni texto adicional fuera del JSON.
+
+Texto a analizar:
+\"\"\"{texto}\"\"\"
+    """
+
+    try:
+        completion = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.2
+        )
+
+        respuesta_modelo = completion.choices[0].message.content
+        print(respuesta_modelo)
+
+        json_match = re.search(r'```(?:json)?\s*([\s\S]+?)\s*```', respuesta_modelo)
+        if json_match:
+            contenido_json = json_match.group(1)
+        else:
+            contenido_json = respuesta_modelo
+
+        respuesta_json = json.loads(contenido_json)
         return jsonify(respuesta_json)
 
     except Exception as e:
